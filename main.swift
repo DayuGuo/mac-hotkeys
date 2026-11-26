@@ -6,10 +6,15 @@ mac-hotkeys 盘点这台 Mac 的全局快捷键，并导出 Markdown。
 
   mac-hotkeys                              生成当前目录的 mac-hotkeys.md，重名时自动编号
   mac-hotkeys export ~/Desktop/快捷键.md     指定输出文件
-  mac-hotkeys export [文件] [--all] [--no-probe] [--force]
-    --all       包含已停用、应用未运行及只有默认值的配置
-    --no-probe  仅读取配置，跳过独占注册探测
+  mac-hotkeys export [文件] [--all] [--probe] [--force] [--baseline 旧清单.md或JSON]
+    --all       也包含已停用及只有默认值的配置。默认已含未运行应用的配置
+    --probe     额外列出 Carbon 独占注册冲突，独立于主动扫描
     --force     允许替换目标报告
+  mac-hotkeys scan --dry-run [--limit N]                   预览本轮清单外的候选，不发键
+  mac-hotkeys scan --self-test                             仅检查权限及末端拦截
+  mac-hotkeys scan [文件] [--limit N]                       自检后发送候选，默认每批 32 组
+    也可用 export --scan。扫描中按任意键会中止，已完成的观察会写入报告
+    --state-dir 目录    指定本机快照目录，默认 ~/Library/Application Support/mac-hotkeys
 
   mac-hotkeys list [--all] [--json | --markdown]           在终端列出配置
   mac-hotkeys apps [--json | --markdown]                   列出本机应用名称、标识和路径
@@ -120,9 +125,9 @@ private func diagnostic(_ message: String) {
 
 private func run(_ rawArguments: [String]) throws {
     if rawArguments.contains("--help") || rawArguments.contains("-h") { print(usage); return }
-    if rawArguments == ["--version"] { print("mac-hotkeys 0.4.0"); return }
-    if rawArguments.isEmpty || rawArguments.first == "export" {
-        try exportMarkdown(arguments: rawArguments.dropFirst())
+    if rawArguments == ["--version"] { print("mac-hotkeys 0.5.0"); return }
+    if rawArguments.isEmpty || rawArguments.first == "export" || rawArguments.first == "scan" {
+        try exportMarkdown(arguments: rawArguments.dropFirst(), active: rawArguments.first == "scan")
         return
     }
     let all = rawArguments.contains("--all")
@@ -138,7 +143,7 @@ private func run(_ rawArguments: [String]) throws {
     case "list":
         guard arguments.count <= 1 else { throw Failure("list does not take key combinations.") }
         let inventory = Inventory()
-        let rows = inventory.bindings().filter { all || $0.isCurrent || $0.status == .saved }
+        let rows = inventory.bindings().filter { all || ($0.status != .disabled && $0.status != .unverified) }
         if format == .json {
             try format.json(ListReport(bindings: rows, warnings: inventory.warnings))
         } else {

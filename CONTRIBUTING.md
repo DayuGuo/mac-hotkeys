@@ -26,3 +26,5 @@ build_dir=$(mktemp -d)
 ## 发布
 
 合并后由一人负责发版。同步 `main`，确认 `mac-hotkeys --version` 对应的新版本已提交，从该提交运行 `./scripts/package.sh`。把同一提交标记为 `vX.Y.Z` 并推送标签，在 GitHub Release 附上 `dist/mac-hotkeys-arm64.zip` 与 `dist/mac-hotkeys-x86_64.zip`，再发布为最新版本。README 的安装命令会自动选择对应的包。
+
+修改主动扫描或规则解码时，运行 `./scripts/test-discovery.sh`。这组回归使用虚构配置和事件样本，验证候选排除、观察证据、基线和扫描轮换。涉及系统投递的变更需要用独立、无动作的接收器对照，分别记录是否收到热键回调以及扫描器实际看到的事件。
