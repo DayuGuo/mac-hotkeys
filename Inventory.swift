@@ -313,19 +313,40 @@ struct Inventory {
     }
 
     private func swiftShortcuts() -> [Binding] {
-        var seen = Set<String>()
-        return runningApps.flatMap { app -> [Binding] in
-            guard let domain = app.bundleIdentifier, !domain.hasPrefix("com.apple."), seen.insert(domain).inserted else { return [] }
-            let prefix = "KeyboardShortcuts_"
-            return preferences(domain).compactMap { name, raw -> Binding? in
-                guard name.hasPrefix(prefix), let value = raw as? String, let data = value.data(using: .utf8),
-                      let entry = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-                      let code = entry["carbonKeyCode"] as? UInt32, code < 65535,
-                      let flags = entry["carbonModifiers"] as? UInt32 else { return nil }
-                let combo = KeyCombo(code: code, modifiers: Modifiers(rawValue: flags).intersection(.standardMask))
-                return Binding(combo, owner: app.localizedName ?? domain, action: String(name.dropFirst(prefix.count)),
-                               status: .configured, source: "\(domain) (KeyboardShortcuts preference)")
-            }
+        var apps: [String: InstalledApp] = [:]
+        for app in InstalledApp.discover() where apps[app.bundleID] == nil {
+            apps[app.bundleID] = app
         }
+        for app in runningApps {
+            guard let id = app.bundleIdentifier else { continue }
+            apps[id] = InstalledApp(name: app.localizedName ?? apps[id]?.name ?? id, bundleID: id,
+                                    path: app.bundleURL?.path ?? apps[id]?.path ?? "")
+        }
+        return apps.values.flatMap { storedKeyboardShortcuts(for: $0, status: state($0.bundleID)) }
+    }
+}
+
+func storedKeyboardShortcuts(for app: InstalledApp, status: Binding.Status, userLibrary: URL = library) -> [Binding] {
+    let domain = app.bundleID
+    guard !domain.hasPrefix("com.apple."), !domain.contains("/"), !domain.isEmpty else { return [] }
+    let relative = "Preferences/\(domain).plist"
+    let normal = userLibrary.appendingPathComponent(relative)
+    var location = normal
+    let marker = "Contents/Resources/KeyboardShortcuts_KeyboardShortcuts.bundle"
+    if !app.path.isEmpty, FileManager.default.fileExists(atPath: URL(fileURLWithPath: app.path).appendingPathComponent(marker).path) {
+        let container = userLibrary.appendingPathComponent("Containers/\(domain)/Data/Library").appendingPathComponent(relative)
+        if FileManager.default.isReadableFile(atPath: container.path) { location = container }
+    }
+    guard let prefs = readPlist(at: location) as? [String: Any] else { return [] }
+    let prefix = "KeyboardShortcuts_"
+    let source = location == normal ? "KeyboardShortcuts preference" : "KeyboardShortcuts container preference"
+    return prefs.compactMap { key, raw in
+        guard key.hasPrefix(prefix), let value = raw as? String, let data = value.data(using: .utf8),
+              let entry = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let code = entry["carbonKeyCode"] as? UInt32, code < 65535,
+              let flags = entry["carbonModifiers"] as? UInt32 else { return nil }
+        let mods = Modifiers(rawValue: flags).intersection(Modifiers.standardMask.union(.function))
+        return Binding(KeyCombo(code: code, modifiers: mods), owner: app.name, action: String(key.dropFirst(prefix.count)),
+                       status: status, source: "\(domain) (\(source))")
     }
 }

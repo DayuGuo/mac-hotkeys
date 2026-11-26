@@ -23,7 +23,7 @@ struct AppShortcutReaders {
     private let superchargeDomains = ["com.sindresorhus.Supercharge-setapp", "com.sindresorhus.Supercharge"]
 
     func scans() -> [AppShortcutScan] {
-        [cleanShot(), copyEm(), weChat(), supercharge(), codex(), linguaX()]
+        [cleanShot(), copyEm(), weChat(), supercharge(), codex(), linguaX(), picGo()]
     }
 
     private func scan(_ owner: String, domains: [String], bindings: [Binding], detail: String,
@@ -146,6 +146,25 @@ struct AppShortcutReaders {
         }
         return scan(owner, domains: [domain], bindings: bindings,
                     detail: "读取 com.openai.codex 显式保存的全局听写键和 Appshot 键")
+    }
+
+    private func picGo() -> AppShortcutScan {
+        let owner = "PicGo"
+        let domain = "com.molunerfinn.picgo"
+        let path = library.appendingPathComponent("Application Support/picgo/data.json")
+        let settings = readJSON(at: path)?["settings"] as? [String: Any]
+        let shortcuts = settings?["shortKey"] as? [String: Any] ?? [:]
+        // PicGo registers built-in commands directly. Plugin commands also depend on
+        // the plugin still being installed and exporting the corresponding handler.
+        let bindings = shortcuts.compactMap { id, value -> Binding? in
+            guard id.hasPrefix("picgo:"), let entry = value as? [String: Any],
+                  let enabled = entry["enable"] as? Bool, let key = entry["key"] as? String,
+                  let combo = KeyCombo(argument: key) else { return nil }
+            return Binding(combo, owner: owner, action: id == "picgo:upload" ? "上传图片" : id,
+                           status: enabled ? state(domain) : .disabled, source: "PicGo settings.shortKey · \(id)")
+        }
+        return scan(owner, domains: [domain], bindings: bindings,
+                    detail: "读取 settings.shortKey 中保存的 PicGo 内置全局快捷键")
     }
 
     private func linguaX() -> AppShortcutScan {
