@@ -12,7 +12,8 @@ mac-hotkeys 盘点这台 Mac 的全局快捷键，并导出 Markdown。
     --force     允许替换目标报告
 
   mac-hotkeys list [--all] [--json | --markdown]           在终端列出配置
-  mac-hotkeys coverage [--json | --markdown]               查看六款重点应用的读取结果
+  mac-hotkeys apps [--json | --markdown]                   列出本机应用名称、标识和路径
+  mac-hotkeys coverage [--json | --markdown]               查看重点应用的读取结果
   mac-hotkeys probe [组合 ...] [--all] [--json | --markdown]  查看 Carbon 注册状态
   mac-hotkeys probe cmd+space ctrl+option+shift+cmd+t
   mac-hotkeys --version
@@ -119,7 +120,7 @@ private func diagnostic(_ message: String) {
 
 private func run(_ rawArguments: [String]) throws {
     if rawArguments.contains("--help") || rawArguments.contains("-h") { print(usage); return }
-    if rawArguments == ["--version"] { print("mac-hotkeys 0.3.0"); return }
+    if rawArguments == ["--version"] { print("mac-hotkeys 0.4.0"); return }
     if rawArguments.isEmpty || rawArguments.first == "export" {
         try exportMarkdown(arguments: rawArguments.dropFirst())
         return
@@ -144,6 +145,15 @@ private func run(_ rawArguments: [String]) throws {
             inventory.warnings.forEach(diagnostic)
             format.table(headers: ["Shortcut", "Owner", "Action", "Status", "Source"],
                          rows: rows.map { [$0.shortcut, $0.owner, $0.action, $0.status.rawValue, $0.source] })
+        }
+
+    case "apps":
+        guard arguments.count == 1, !all else { throw Failure("用法  mac-hotkeys apps [--json | --markdown]") }
+        let apps = InstalledApp.discover()
+        if format == .json {
+            try format.json(apps)
+        } else {
+            format.table(headers: ["App", "Bundle ID", "Path"], rows: apps.map { [$0.name, $0.bundleID, $0.path] })
         }
 
     case "coverage":

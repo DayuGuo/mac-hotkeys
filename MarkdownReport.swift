@@ -94,7 +94,7 @@ func renderMarkdown(bindings: [Binding], scans: [AppShortcutScan], probe: ProbeR
     }
 
     blocks.append("## 重点应用读取情况")
-    blocks.append("下表列出六个专用读取器的结果。条数包含应用已保存的配置。“—”表示此次无法确定数量。")
+    blocks.append("条数包含各应用已保存的配置。“—”表示此次无法确定数量。")
     blocks.append(markdownTable(["应用", "运行状态", "读取结果", "配置条数", "读取范围或原因"], scans.map { scan in
         let state = scan.running.map { $0 ? "运行中" : "未运行" } ?? "未知"
         let count = (scan.status == .bindingsFound || scan.status == .noKeyboardRules) ? String(scan.bindings.count) : "—"

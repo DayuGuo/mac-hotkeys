@@ -103,4 +103,5 @@ if [ "$(command -v mac-hotkeys || true)" = "$destination" ]; then
     printf '运行 mac-hotkeys 即可生成快捷键清单。\n'
 else
     printf '运行 %q 即可生成快捷键清单。\n' "$destination"
+    printf '要在当前终端直接运行 mac-hotkeys，请执行  export PATH=%q:"$PATH"\n' "$bin_dir"
 fi
