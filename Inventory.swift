@@ -284,32 +284,9 @@ struct Inventory {
     }
 
     private func karabiner() -> [Binding] {
-        let path = home.appendingPathComponent(".config/karabiner/karabiner.json")
-        guard let profiles = readJSON(at: path)?["profiles"] as? [[String: Any]],
-              let profile = profiles.first(where: { $0["selected"] as? Bool == true }),
-              let complex = profile["complex_modifications"] as? [String: Any],
-              let rules = complex["rules"] as? [[String: Any]] else { return [] }
-        let owner = "Karabiner-Elements"
-        let appState = state("org.pqrs.Karabiner-Console-User-Server", "org.pqrs.Karabiner-Core-Service")
-        return rules.flatMap { rule -> [Binding] in
-            let status: Binding.Status = rule["enabled"] as? Bool == false ? .disabled : appState
-            let manipulators = rule["manipulators"] as? [[String: Any]] ?? []
-            return manipulators.compactMap { manipulator in
-                guard let from = manipulator["from"] as? [String: Any], let key = from["key_code"] as? String,
-                      let action = manipulator["description"] as? String ?? rule["description"] as? String else { return nil }
-                let config = from["modifiers"] as? [String: Any]
-                let required = config?["mandatory"] as? [String] ?? []
-                let aliases: [String: Modifiers] = ["command": .command, "control": .control,
-                                                    "option": .option, "shift": .shift, "fn": .function]
-                let mods = required.reduce(Modifiers()) { mods, raw in
-                    let normal = raw.replacingOccurrences(of: "left_", with: "").replacingOccurrences(of: "right_", with: "")
-                    return mods.union(aliases[normal] ?? [])
-                }
-                let knownKeys = ["caps_lock": "Caps Lock", "spacebar": "Space", "return_or_enter": "Return"]
-                let label = mods.symbols + (knownKeys[key] ?? key.replacingOccurrences(of: "_", with: " "))
-                return Binding(shortcut: label, owner: owner, action: action, status: status, source: "karabiner.json")
-            }
-        }
+        guard let profile = karabinerSelectedProfile() else { return [] }
+        let status = state("org.pqrs.Karabiner-Console-User-Server", "org.pqrs.Karabiner-Core-Service")
+        return KarabinerRules.bindings(profile: profile, status: status)
     }
 
     private func swiftShortcuts() -> [Binding] {

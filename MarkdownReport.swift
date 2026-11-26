@@ -1,7 +1,7 @@
 import Foundation
 
 // Keep values from preferences and macro names inside a single, literal table cell.
-private func markdownText(_ value: String) -> String {
+func markdownText(_ value: String) -> String {
     var output = ""
     for char in value {
         switch char {
@@ -17,7 +17,7 @@ private func markdownText(_ value: String) -> String {
     return output
 }
 
-private func markdownTable(_ headers: [String], _ rows: [[String]]) -> String {
+func markdownTable(_ headers: [String], _ rows: [[String]]) -> String {
     let divider = Array(repeating: "---", count: headers.count)
     return ([headers, divider] + rows).map { values in
         "| " + values.map(markdownText).joined(separator: " | ") + " |"
@@ -49,7 +49,7 @@ private extension AppShortcutScan.Status {
 }
 
 func renderMarkdown(bindings: [Binding], scans: [AppShortcutScan], probe: ProbeReport?, probeRequested: Bool,
-                    warnings: [String], all: Bool) -> String {
+                    warnings: [String], all: Bool, discoveries: String) -> String {
     let clock = DateFormatter()
     clock.locale = Locale(identifier: "en_US_POSIX")
     clock.timeZone = .current
@@ -65,8 +65,9 @@ func renderMarkdown(bindings: [Binding], scans: [AppShortcutScan], probe: ProbeR
     if !warnings.isEmpty {
         blocks.append("**采集提示**\n\n" + warnings.map { "- " + markdownText($0) }.joined(separator: "\n"))
     }
-    let scope = all ? "本次也列出已停用、应用未运行及只有默认值的记录。"
-                    : "加上 `--all` 可查看已停用、应用未运行及只有默认值的记录。"
+    blocks.append(discoveries.trimmingCharacters(in: .newlines))
+    let scope = all ? "本次也列出已停用及只有默认值的记录。"
+                    : "包含未运行应用已保存的键位。加上 `--all` 可查看已停用及只有默认值的记录。"
     blocks.append("软件归属来自可读配置，仅覆盖工具能识别的设置。实际处理按键的软件仍需通过事件验证。“已配置”表示对应应用正在运行且设置可读，或系统偏好标为启用。“系统已启用”来自当前登录会话。\(scope)")
     blocks.append("⌃ Control　⌥ Option　⇧ Shift　⌘ Command。字母及标点按美式物理键位显示。")
     for (title, rows) in [("应用快捷键", applications), ("系统快捷键", system)] {
@@ -77,7 +78,7 @@ func renderMarkdown(bindings: [Binding], scans: [AppShortcutScan], probe: ProbeR
             }))
     }
 
-    blocks.append("## 独占注册冲突")
+    if probeRequested { blocks.append("## 独占注册冲突") }
     if let probe {
         blocks.append("枚举 \(probe.scanned) 个组合，发现 \(probe.conflicts) 个冲突、\(probe.registrable) 个可注册、\(probe.errors) 个探测错误。每次注册成功后立即释放。")
         blocks.append("探测范围是常用物理键配合 ⌃、⌥、⇧、⌘ 的 15 种非空组合。Carbon 只返回注册状态，部分系统保留键也会报告冲突。实际处理进程仍待确认，事件监听、长按、双击或重映射也可能使用可注册的键。")
@@ -89,8 +90,8 @@ func renderMarkdown(bindings: [Binding], scans: [AppShortcutScan], probe: ProbeR
                         matches.isEmpty ? "未找到" : matches.joined(separator: "、")]
             }))
         }
-    } else {
-        blocks.append(probeRequested ? "本次未取得探测结果，原因见上方采集提示。" : "本次按 `--no-probe` 跳过了注册探测。")
+    } else if probeRequested {
+        blocks.append("本次未取得注册探测结果，原因见上方采集提示。")
     }
 
     blocks.append("## 重点应用读取情况")
